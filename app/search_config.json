@@ -1,0 +1,81 @@
+{
+  "matching_policy": {
+    "mode": "semantic",
+    "description": "Use these titles as search seeds and examples, not an exact-match allowlist. Include vacancies with different titles when their responsibilities substantially match the candidate profile.",
+    "include_adjacent_titles": true,
+    "require_responsibility_match": true
+  },
+  "career_tracks": [
+    {
+      "name": "customer_success_and_operations",
+      "adzuna_queries": [
+        "customer success manager",
+        "customer operations manager",
+        "service delivery contact centre manager"
+      ],
+      "reed_queries": [
+        "customer success manager",
+        "customer operations manager",
+        "service delivery manager"
+      ],
+      "titles": [
+        "Head of Customer Service",
+        "Head of Customer Support",
+        "Customer Support Lead",
+        "Customer Service Lead",
+        "Customer Service Manager",
+        "Customer Operations Manager",
+        "Head of Contact Centre",
+        "Head of Contact Center",
+        "Contact Centre Manager",
+        "Contact Center Manager",
+        "Operations Manager",
+        "Service Delivery Manager",
+        "Customer Experience Manager",
+        "Customer Satisfaction Manager",
+        "Customer Success Manager",
+        "Customer Success Lead",
+        "Head of Customer Success",
+        "Client Success Manager",
+        "Customer Onboarding Manager",
+        "Customer Retention Manager",
+        "Customer Relationship Manager",
+        "Account Manager"
+      ]
+    },
+    {
+      "name": "product_payments_and_delivery",
+      "adzuna_queries": [
+        "product manager payments",
+        "project delivery manager",
+        "business analyst product owner"
+      ],
+      "reed_queries": [
+        "product manager payments",
+        "project delivery manager",
+        "business analyst product owner"
+      ],
+      "titles": [
+        "Product Manager",
+        "Product Owner",
+        "Cards Product Manager",
+        "Card Product Manager",
+        "Payments Product Manager",
+        "Cards and Payments Product Manager",
+        "Digital Payments Product Manager",
+        "Fintech Product Manager",
+        "Project Manager",
+        "Digital Project Manager",
+        "Technology Project Manager",
+        "Project Coordinator",
+        "Project Support Officer",
+        "Project Support",
+        "Programme Coordinator",
+        "Delivery Manager",
+        "Agile Delivery Manager",
+        "Business Analyst",
+        "Product Business Analyst"
+      ]
+    }
+  ]
+}

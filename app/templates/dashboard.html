@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Job dashboard · SponsorPath{% endblock %}
+{% block content %}
+  <section class="hero shell">
+    <div>
+      <span class="eyebrow">Opportunity dashboard</span>
+      <h1>Find the roles worth<br><em>your time.</em></h1>
+      <p>Every vacancy is scored against your experience and checked against the UK Skilled Worker sponsor register.</p>
+    </div>
+    <div class="hero-orbit" aria-hidden="true">
+      <div class="orbit-score">{{ metrics.qualified }}</div>
+      <span>qualified<br>matches</span>
+    </div>
+  </section>
+
+  {% if message %}<div class="toast shell">{{ message }}</div>{% endif %}
+
+  <section class="metrics shell">
+    <article><span>Qualified</span><strong>{{ metrics.qualified }}</strong><small>ready to review</small></article>
+    <article><span>Confirmed CoS</span><strong>{{ metrics.confirmed }}</strong><small>explicit sponsorship</small></article>
+    <article><span>Possible CoS</span><strong>{{ metrics.possible }}</strong><small>confirm with recruiter</small></article>
+    <article><span>Tailored</span><strong>{{ metrics.tailored }}</strong><small>application packs</small></article>
+    <article><span>Applied</span><strong>{{ metrics.applied }}</strong><small>applications sent</small></article>
+  </section>
+
+  <section class="workspace shell">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">Your opportunities</span>
+        <h2>Job matches</h2>
+      </div>
+      <span class="result-count">{{ jobs|length }} shown</span>
+    </div>
+
+    <form class="filters" method="get">
+      <label class="search-field">
+        <span>Search</span>
+        <input type="search" name="q" value="{{ q }}" placeholder="Role, employer or location">
+      </label>
+      <label>
+        <span>Sponsorship</span>
+        <select name="qualification">
+          <option value="qualified" {% if qualification == "qualified" %}selected{% endif %}>All qualified</option>
+          <option value="qualified_confirmed" {% if qualification == "qualified_confirmed" %}selected{% endif %}>Confirmed</option>
+          <option value="qualified_possible" {% if qualification == "qualified_possible" %}selected{% endif %}>Possible — confirm</option>
+          <option value="" {% if qualification == "" %}selected{% endif %}>Every stored job</option>
+          <option value="review_sponsor_not_matched" {% if qualification == "review_sponsor_not_matched" %}selected{% endif %}>Needs sponsor review</option>
+        </select>
+      </label>
+      <label>
+        <span>Progress</span>
+        <select name="application">
+          <option value="">Any status</option>
+          {% for value, label in application_statuses.items() %}
+            <option value="{{ value }}" {% if application == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="button button-dark" type="submit">Filter jobs</button>
+    </form>
+
+    <div class="job-grid">
+      {% for job in jobs %}
+        <article class="job-card">
+          <div class="card-topline">
+            <span class="tier tier-{{ job.sponsorship_tier }}">
+              {% if job.sponsorship_tier == "confirmed" %}Confirmed sponsorship{% elif job.sponsorship_tier == "possible" %}Sponsorship possible{% else %}Needs review{% endif %}
+            </span>
+            <span class="source">{{ job.source_name or "Employer site" }}</span>
+          </div>
+          <div class="job-title-row">
+            <div>
+              <h3><a href="/jobs/{{ job.id }}">{{ job.title }}</a></h3>
+              <p>{{ job.employer }} <span>·</span> {{ job.location or "UK location not stated" }}</p>
+            </div>
+            <div class="score" style="--score: {{ job.fit_score }}"><strong>{{ job.fit_score }}</strong><span>fit</span></div>
+          </div>
+          <div class="job-facts">
+            <span>{{ job.salary_text or "Salary not stated" }}</span>
+            <span>{{ application_statuses.get(job.application_status, job.application_status) }}</span>
+            {% if job.has_documents %}<span class="ready-pill">CV ready</span>{% endif %}
+          </div>
+          <div class="reason-list">
+            {% for reason in (job.fit_reasons or [])[:2] %}<span>{{ reason }}</span>{% endfor %}
+          </div>
+          <div class="card-actions">
+            <a class="text-link" href="/jobs/{{ job.id }}">Review & tailor <span>→</span></a>
+            <a class="external-link" href="{{ job.vacancy_url }}" target="_blank" rel="noopener">Original advert ↗</a>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state">
+          <strong>No jobs match these filters.</strong>
+          <p>Try clearing the search or showing every stored job.</p>
+          <a class="button button-dark" href="/">Reset filters</a>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,108 @@
+{
+  "name": "Oluwatosin Tobun",
+  "location": "United Kingdom",
+  "visa": {
+    "current_route": "UK Graduate Visa",
+    "expiry": "December 2026",
+    "requires_future_sponsorship": true,
+    "relocation": "Anywhere in the United Kingdom"
+  },
+  "target_tracks": [
+    "Customer Success and Customer Operations",
+    "Product Ownership, Business Analysis and Project Delivery"
+  ],
+  "education": [
+    {
+      "qualification": "MSc Advanced Computer Science",
+      "institution": "University of Hull",
+      "dates": "September 2023 to September 2024"
+    },
+    {
+      "qualification": "BSc (Hons) Computer Science",
+      "institution": "Taraba State University",
+      "dates": "November 2011 to August 2016"
+    }
+  ],
+  "experience": [
+    {
+      "employer": "The ESP Group Ltd",
+      "location": "Hull, United Kingdom",
+      "role": "Team Leader, Customer Service Operations",
+      "dates": "February 2025 to present",
+      "facts": [
+        "Leads a customer service operations team supporting 10 client accounts.",
+        "Improved SLA performance from the mid-70% range to consistently above 92%.",
+        "Reduced escalation volumes by approximately 70%.",
+        "Monitors SLA, AHT, quality, adherence and customer satisfaction trends.",
+        "Leads onboarding, coaching, workflow improvement and operational governance."
+      ]
+    },
+    {
+      "employer": "The ESP Group Ltd",
+      "location": "Hull, United Kingdom",
+      "role": "Customer Service Advisor",
+      "dates": "September 2023 to February 2025",
+      "facts": [
+        "Delivered multichannel customer support across transport contracts.",
+        "Maintained accurate CRM records and supported service recovery.",
+        "Used Salesforce, Zendesk, Jira, Genesys, Keystone and 8x8."
+      ]
+    },
+    {
+      "employer": "First Bank of Nigeria",
+      "location": "Lagos, Nigeria",
+      "role": "Product Manager, Digital Products and Payments",
+      "dates": "April 2021 to September 2023",
+      "facts": [
+        "Owned SME and corporate credit-card and digital-payment portfolios.",
+        "Grew annual portfolio revenue from approximately NGN400 million to NGN1.2 billion.",
+        "Delivered 100% of gross revenue targets and 79% of net revenue targets.",
+        "Improved credit-card eligibility processing time by 85% through automation.",
+        "Increased virtual-card acquisition by 55% through mobile-banking integration.",
+        "Managed backlogs, sprint planning, requirements, user stories, BRDs, FRDs, use cases and acceptance criteria.",
+        "Worked with engineering, QA, compliance, operations, Visa, Mastercard and Network International.",
+        "Created wireframes, process flows and system documentation and supported API integrations."
+      ]
+    },
+    {
+      "employer": "First Bank of Nigeria",
+      "location": "Lagos, Nigeria",
+      "role": "Programme Coordinator, Learning and Development",
+      "dates": "February 2018 to January 2021",
+      "facts": [
+        "Designed and delivered structured training programmes for more than 6,000 employees.",
+        "Performed training-needs analysis and developed e-learning, simulations and assessments.",
+        "Evaluated training effectiveness using feedback, assessments and performance data."
+      ]
+    }
+  ],
+  "skills": [
+    "Customer success",
+    "Customer operations",
+    "Customer onboarding and retention",
+    "Escalation management",
+    "SLA and KPI management",
+    "Product ownership",
+    "Product lifecycle management",
+    "Agile delivery",
+    "Business analysis and requirements",
+    "Backlog prioritisation and sprint planning",
+    "Customer journey mapping",
+    "Process improvement",
+    "Stakeholder management",
+    "Risk and dependency management",
+    "Payments and financial services",
+    "Salesforce",
+    "Zendesk",
+    "Jira",
+    "Confluence",
+    "Power BI",
+    "Python",
+    "C#",
+    "SQL",
+    "APIs",
+    "Wireframing"
+  ],
+  "truth_policy": "Never add qualifications, employers, dates, duties, tools or achievements not present in this profile."
+}
+

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uk-sponsorship-job-agent"
+version = "0.1.0"
+description = "Sponsorship-first UK job discovery and CV tailoring assistant"
+requires-python = ">=3.12"
+dependencies = [
+  "apscheduler>=3.10,<4",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "jinja2>=3.1,<4",
+  "openai>=1.100,<3",
+  "psycopg[binary]>=3.2,<4",
+  "pypdf>=6,<7",
+  "python-docx>=1.2,<2",
+  "python-multipart>=0.0.20,<1",
+  "rapidfuzz>=3.14,<4",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4,<9",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+job-agent = "app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["*.json", "*.sql", "templates/*.html", "static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

@@ -1,0 +1,2 @@
+"""UK sponsorship job agent."""
+

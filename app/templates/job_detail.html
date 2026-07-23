@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} · SponsorPath{% endblock %}
+{% block content %}
+  <section class="detail-shell shell">
+    <a class="back-link" href="/">← Back to all opportunities</a>
+    {% if message %}<div class="toast">{{ message }}</div>{% endif %}
+    {% if error %}<div class="toast toast-error">{{ error }}</div>{% endif %}
+
+    <div class="detail-hero">
+      <div>
+        <div class="card-topline">
+          <span class="tier tier-{{ job.sponsorship_tier }}">
+            {% if job.sponsorship_tier == "confirmed" %}Confirmed sponsorship{% elif job.sponsorship_tier == "possible" %}Sponsorship possible — confirm first{% else %}Needs manual review{% endif %}
+          </span>
+          <span class="source">{{ job.source_name or "Employer listing" }}</span>
+        </div>
+        <h1>{{ job.title }}</h1>
+        <p class="company-line">{{ job.employer }} <span>·</span> {{ job.location or "UK location not stated" }}</p>
+        <div class="detail-facts">
+          <span><small>Salary</small>{{ job.salary_text or "Not stated" }}</span>
+          <span><small>Career track</small>{{ (job.career_track or "Cross-functional")|replace("_", " ")|title }}</span>
+          <span><small>Found</small>{{ job.first_seen_at.strftime("%d %b %Y") }}</span>
+        </div>
+      </div>
+      <div class="large-score" style="--score: {{ job.fit_score }}">
+        <strong>{{ job.fit_score }}%</strong>
+        <span>CV match</span>
+      </div>
+    </div>
+
+    <div class="detail-layout">
+      <div class="detail-main">
+        <section class="panel">
+          <span class="eyebrow">Fit analysis</span>
+          <h2>Why this role matches</h2>
+          <ul class="check-list">
+            {% for reason in job.fit_reasons or [] %}<li>{{ reason }}</li>{% else %}<li>No fit explanation was recorded.</li>{% endfor %}
+          </ul>
+          {% if job.missing_requirements %}
+            <h3>Points to review honestly</h3>
+            <ul class="gap-list">{% for gap in job.missing_requirements %}<li>{{ gap }}</li>{% endfor %}</ul>
+          {% endif %}
+        </section>
+
+        <section class="panel sponsorship-panel">
+          <span class="eyebrow">Sponsorship check</span>
+          <h2>
+            {% if job.sponsorship_tier == "confirmed" %}The vacancy mentions sponsorship
+            {% elif job.sponsorship_tier == "possible" %}Licensed employer, confirmation required
+            {% else %}Sponsor evidence needs review{% endif %}
+          </h2>
+          <p>{{ job.sponsorship_evidence or "The advert does not explicitly confirm sponsorship for this role." }}</p>
+          <dl>
+            <div><dt>Register match</dt><dd>{{ job.sponsor_register_name or "Not confidently matched" }}</dd></div>
+            <div><dt>Salary assessment</dt><dd>{{ job.salary_rule_reason or job.salary_rule_status|replace("_", " ")|title }}</dd></div>
+          </dl>
+          {% if job.sponsorship_tier == "possible" %}
+            <div class="recruiter-script">
+              “I am currently on a UK Graduate visa and would require Skilled Worker sponsorship for continued employment. Is sponsorship available for this specific role?”
+            </div>
+          {% endif %}
+        </section>
+
+        {% if job.summary %}
+          <section class="panel">
+            <span class="eyebrow">Vacancy overview</span>
+            <h2>Role summary</h2>
+            <p>{{ job.summary }}</p>
+          </section>
+        {% endif %}
+      </div>
+
+      <aside>
+        <section class="action-card">
+          <span class="eyebrow">Application pack</span>
+          <h2>Tailor your CV</h2>
+          <p>Create an ATS-friendly CV, cover letter and review notes using only verified facts from your profile.</p>
+          <form method="post" action="/jobs/{{ job.id }}/tailor" data-tailor-form>
+            <button class="button button-accent full-width" type="submit">
+              <span class="button-label">{% if documents %}Create a new version{% else %}Create tailored documents{% endif %}</span>
+              <span class="button-loading">Creating…</span>
+            </button>
+          </form>
+          <small>This uses the OpenAI API and may take around a minute.</small>
+        </section>
+
+        <section class="action-card">
+          <span class="eyebrow">Progress</span>
+          <form method="post" action="/jobs/{{ job.id }}/status">
+            <label>
+              <span>Application status</span>
+              <select name="status" data-auto-submit>
+                {% for value, label in application_statuses.items() %}
+                  <option value="{{ value }}" {% if job.application_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </form>
+          <a class="button button-outline full-width" href="{{ job.vacancy_url }}" target="_blank" rel="noopener">Open original vacancy ↗</a>
+        </section>
+
+        {% if documents %}
+          <section class="action-card documents-card">
+            <span class="eyebrow">Generated files</span>
+            <h2>{{ documents|length }} version{% if documents|length != 1 %}s{% endif %}</h2>
+            {% for document in documents %}
+              <div class="document-version">
+                <span>{{ document.created_at.strftime("%d %b %Y, %H:%M") }}</span>
+                <a href="/documents/{{ document.id }}/cv">Tailored CV <b>↓</b></a>
+                <a href="/documents/{{ document.id }}/cover-letter">Cover letter <b>↓</b></a>
+                {% if document.review_notes_path %}<a href="/documents/{{ document.id }}/review-notes">Review notes <b>↓</b></a>{% endif %}
+              </div>
+            {% endfor %}
+          </section>
+        {% endif %}
+      </aside>
+    </div>
+  </section>
+{% endblock %}
