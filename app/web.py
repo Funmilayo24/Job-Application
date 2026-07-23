@@ -17,7 +17,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import Settings
 from app.db import Database
 from app.documents import write_application_documents
+from app.job_logic import qualification_status, sponsorship_tier
 from app.openai_service import OpenAIJobService, load_candidate_profile
+from app.vacancy_validator import VacancyValidator, preserve_confirmed_closure
 
 BASE_DIR = Path(__file__).resolve().parent
 ARTIFACT_ROOT = Path("artifacts").resolve()
@@ -258,16 +260,39 @@ def tailor_job(
     _user: Annotated[str | None, Depends(require_user)],
 ):
     settings = _settings()
-    if not settings.openai_api_key:
-        return RedirectResponse(
-            f"/jobs/{job_id}?error={quote('OPENAI_API_KEY is not configured')}",
-            status_code=303,
-        )
     database = Database(settings.database_url)
     database.initialise()
     job = database.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    with VacancyValidator() as validator:
+        validation = validator.validate(job)
+    validation = preserve_confirmed_closure(job, validation)
+    validated = {**job, **validation.as_dict()}
+    current_status = qualification_status(validated, settings.min_fit_score)
+    database.update_vacancy_validation(
+        job_id,
+        resolved_vacancy_url=validation.resolved_vacancy_url,
+        link_status=validation.link_status,
+        expiry_status=validation.expiry_status,
+        qualification_status=current_status,
+        sponsorship_tier=sponsorship_tier(current_status),
+    )
+    if validation.expiry_status == "expired":
+        return RedirectResponse(
+            f"/jobs/{job_id}?error={quote('This vacancy is closed or expired')}",
+            status_code=303,
+        )
+    if validation.link_status == "broken":
+        return RedirectResponse(
+            f"/jobs/{job_id}?error={quote('The original vacancy link no longer works')}",
+            status_code=303,
+        )
+    if not settings.openai_api_key:
+        return RedirectResponse(
+            f"/jobs/{job_id}?error={quote('OPENAI_API_KEY is not configured')}",
+            status_code=303,
+        )
     database.update_application_status(job_id, "tailoring")
     try:
         service = OpenAIJobService(

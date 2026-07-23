@@ -86,8 +86,7 @@ def write_application_documents(
         "",
         *[f"- {note}" for note in content["review_notes"]],
         "",
-        f"Vacancy: {job['vacancy_url']}",
+        f"Vacancy: {job.get('resolved_vacancy_url') or job['vacancy_url']}",
     ]
     notes_path.write_text("\n".join(notes), encoding="utf-8")
     return cv_path, letter_path, notes_path
-

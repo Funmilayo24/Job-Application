@@ -79,6 +79,17 @@ def test_explicit_sponsorship_exclusion_is_rejected() -> None:
     assert qualification_status(job, 65) == "rejected_sponsorship_excluded"
 
 
+def test_expired_or_broken_vacancy_is_rejected() -> None:
+    job = base_job()
+    job["sponsor_register_match"] = True
+    job["expiry_status"] = "expired"
+    assert qualification_status(job, 65) == "rejected_expired"
+
+    job["expiry_status"] = "open"
+    job["link_status"] = "broken"
+    assert qualification_status(job, 65) == "rejected_broken_link"
+
+
 def test_search_titles_are_semantic_seeds() -> None:
     config = load_search_config()
     titles = {

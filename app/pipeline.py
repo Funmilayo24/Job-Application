@@ -8,10 +8,11 @@ from app.adzuna import AdzunaClient
 from app.config import Settings
 from app.db import Database
 from app.emailer import ResendEmailer
-from app.job_logic import prepare_job
+from app.job_logic import prepare_job, qualification_status, sponsorship_tier
 from app.openai_service import OpenAIJobService
 from app.reed import ReedClient
 from app.sponsor_register import SponsorMatcher, download_sponsors, normalise_company_name
+from app.vacancy_validator import VacancyValidator, preserve_confirmed_closure
 
 logger = logging.getLogger(__name__)
 _NON_WORD = re.compile(r"[^a-z0-9]+")
@@ -103,14 +104,18 @@ class JobPipeline:
                 : self.settings.max_discovered_jobs
             ]
             discovered = len(raw_jobs)
-            for raw in raw_jobs:
-                employer = str(raw.get("employer", ""))
-                prepared = prepare_job(
-                    raw,
-                    sponsor_match=matcher.match(employer),
-                    min_fit_score=self.settings.min_fit_score,
-                )
-                self.db.upsert_job(run_id, prepared)
+            with VacancyValidator() as validator:
+                validations = validator.validate_many(raw_jobs)
+                for raw, validation in zip(raw_jobs, validations, strict=True):
+                    validated = {**raw, **validation.as_dict()}
+                    employer = str(validated.get("employer", ""))
+                    prepared = prepare_job(
+                        validated,
+                        sponsor_match=matcher.match(employer),
+                        min_fit_score=self.settings.min_fit_score,
+                    )
+                    self.db.upsert_job(run_id, prepared)
+                self._revalidate_pending_jobs(validator)
 
             jobs = self.db.unemailed_digest_jobs(
                 possible_limit=self.settings.possible_email_limit
@@ -139,6 +144,22 @@ class JobPipeline:
                 error=str(exc)[:2000],
             )
             raise
+
+    def _revalidate_pending_jobs(self, validator: VacancyValidator) -> None:
+        jobs = self.db.pending_jobs_for_validation()
+        validations = validator.validate_many(jobs)
+        for job, validation in zip(jobs, validations, strict=True):
+            validation = preserve_confirmed_closure(job, validation)
+            validated = {**job, **validation.as_dict()}
+            status = qualification_status(validated, self.settings.min_fit_score)
+            self.db.update_vacancy_validation(
+                int(job["id"]),
+                resolved_vacancy_url=validation.resolved_vacancy_url,
+                link_status=validation.link_status,
+                expiry_status=validation.expiry_status,
+                qualification_status=status,
+                sponsorship_tier=sponsorship_tier(status),
+            )
 
     def send_pending(self) -> int:
         self.db.initialise()

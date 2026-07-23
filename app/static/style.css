@@ -113,6 +113,9 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .job-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 16px; }
 .job-facts span { padding: 7px 9px; border-radius: 8px; background: #efede6; color: #536059; font-size: 11px; }
 .job-facts .ready-pill { color: #18533f; background: #dff3e8; }
+.job-facts .vacancy-open { color: #18533f; background: #dff3e8; }
+.job-facts .vacancy-closed { color: #7c3026; background: #fae9e5; }
+.job-facts .vacancy-unknown { color: #76500f; background: #fff0c8; }
 .reason-list { min-height: 58px; display: grid; gap: 7px; }
 .reason-list span { color: #4e5b55; font-size: 12px; padding-left: 17px; position: relative; }
 .reason-list span::before { content: "✓"; color: var(--green); position: absolute; left: 0; font-weight: 800; }
@@ -141,6 +144,7 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
   color: rgba(255,255,255,.58); background: rgba(255,255,255,.12);
   cursor: not-allowed; transform: none;
 }
+.action-card .button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
 .manual-search-action small { line-height: 1.45; }
 .manual-search-action .search-countdown { color: #d8f3e6; font-weight: 700; }
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 70px 20px; border: 1px dashed #bdb8ab; border-radius: 18px; }

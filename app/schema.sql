@@ -46,8 +46,15 @@ CREATE TABLE IF NOT EXISTS jobs (
     salary_text TEXT,
     source_name TEXT,
     vacancy_url TEXT NOT NULL,
+    resolved_vacancy_url TEXT,
+    link_status TEXT NOT NULL DEFAULT 'unverified'
+        CHECK (link_status IN ('active', 'broken', 'unverified')),
+    link_checked_at TIMESTAMPTZ,
     posted_at TEXT,
     closing_at TEXT,
+    expiry_status TEXT NOT NULL DEFAULT 'unknown'
+        CHECK (expiry_status IN ('open', 'expired', 'unknown')),
+    expiry_checked_at TIMESTAMPTZ,
     summary TEXT,
     career_track TEXT,
     fit_score INTEGER NOT NULL DEFAULT 0 CHECK (fit_score BETWEEN 0 AND 100),
@@ -80,6 +87,16 @@ ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS sponsorship_exclusion_evidence TEXT;
 ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS sponsorship_tier TEXT NOT NULL DEFAULT 'rejected';
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS resolved_vacancy_url TEXT;
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS link_status TEXT NOT NULL DEFAULT 'unverified';
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS link_checked_at TIMESTAMPTZ;
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS expiry_status TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE jobs
+    ADD COLUMN IF NOT EXISTS expiry_checked_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS jobs_qualification_status_idx
     ON jobs (qualification_status);

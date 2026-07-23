@@ -201,6 +201,12 @@ to process. It is limited server-side to one manual request every 24 hours, requ
 at least six hours since the latest search, and cannot overlap another run. Scheduled
 08:00 and 18:00 searches continue independently.
 
+Before a vacancy is emailed, the agent parses its closing date and checks the public
+link while following redirects. Past dates, HTTP `404`/`410` responses and pages that
+explicitly say the vacancy is closed are excluded. Access blocks, rate limits and
+timeouts are labelled **unverified** rather than incorrectly rejected. The same check
+runs again before paid CV tailoring.
+
 ## Cost controls
 
 - Discovery uses GPT-5.6 Luna.

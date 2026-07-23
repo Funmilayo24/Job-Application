@@ -293,7 +293,9 @@ class Database:
                 """
                 INSERT INTO jobs (
                     canonical_key, title, employer, location, salary_text, source_name,
-                    vacancy_url, posted_at, closing_at, summary, career_track, fit_score,
+                    vacancy_url, resolved_vacancy_url, link_status, link_checked_at,
+                    posted_at, closing_at, expiry_status, expiry_checked_at,
+                    summary, career_track, fit_score,
                     fit_reasons, missing_requirements, sponsorship_claim,
                     sponsorship_evidence, sponsorship_evidence_url, explicit_sponsorship,
                     sponsorship_exclusion, sponsorship_exclusion_evidence,
@@ -304,8 +306,10 @@ class Database:
                 )
                 VALUES (
                     %(canonical_key)s, %(title)s, %(employer)s, %(location)s,
-                    %(salary_text)s, %(source_name)s, %(vacancy_url)s, %(posted_at)s,
-                    %(closing_at)s, %(summary)s, %(career_track)s, %(fit_score)s,
+                    %(salary_text)s, %(source_name)s, %(vacancy_url)s,
+                    %(resolved_vacancy_url)s, %(link_status)s, now(),
+                    %(posted_at)s, %(closing_at)s, %(expiry_status)s, now(),
+                    %(summary)s, %(career_track)s, %(fit_score)s,
                     %(fit_reasons)s::jsonb, %(missing_requirements)s::jsonb,
                     %(sponsorship_claim)s, %(sponsorship_evidence)s,
                     %(sponsorship_evidence_url)s, %(explicit_sponsorship)s,
@@ -322,6 +326,13 @@ class Database:
                     employer = EXCLUDED.employer,
                     location = EXCLUDED.location,
                     salary_text = EXCLUDED.salary_text,
+                    posted_at = EXCLUDED.posted_at,
+                    closing_at = EXCLUDED.closing_at,
+                    resolved_vacancy_url = EXCLUDED.resolved_vacancy_url,
+                    link_status = EXCLUDED.link_status,
+                    link_checked_at = EXCLUDED.link_checked_at,
+                    expiry_status = EXCLUDED.expiry_status,
+                    expiry_checked_at = EXCLUDED.expiry_checked_at,
                     fit_score = EXCLUDED.fit_score,
                     fit_reasons = EXCLUDED.fit_reasons,
                     missing_requirements = EXCLUDED.missing_requirements,
@@ -346,6 +357,63 @@ class Database:
             )
             row = cursor.fetchone()
             return int(row["id"]), bool(row["inserted"])
+
+    def pending_jobs_for_validation(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        with self.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM jobs
+                WHERE emailed_at IS NULL
+                  AND qualification_status IN (
+                      'qualified_confirmed',
+                      'qualified_possible',
+                      'rejected_expired',
+                      'rejected_broken_link'
+                  )
+                  AND (
+                      link_checked_at IS NULL
+                      OR link_checked_at < now() - interval '6 hours'
+                  )
+                ORDER BY first_seen_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return list(cursor.fetchall())
+
+    def update_vacancy_validation(
+        self,
+        job_id: int,
+        *,
+        resolved_vacancy_url: str | None,
+        link_status: str,
+        expiry_status: str,
+        qualification_status: str,
+        sponsorship_tier: str,
+    ) -> None:
+        with self.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE jobs
+                SET resolved_vacancy_url = %s,
+                    link_status = %s,
+                    link_checked_at = now(),
+                    expiry_status = %s,
+                    expiry_checked_at = now(),
+                    qualification_status = %s,
+                    sponsorship_tier = %s
+                WHERE id = %s
+                """,
+                (
+                    resolved_vacancy_url,
+                    link_status,
+                    expiry_status,
+                    qualification_status,
+                    sponsorship_tier,
+                    job_id,
+                ),
+            )
 
     def unemailed_digest_jobs(self, *, possible_limit: int = 5) -> list[dict[str, Any]]:
         with self.connect() as connection, connection.cursor() as cursor:

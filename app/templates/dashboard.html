@@ -130,6 +130,15 @@
           <div class="job-facts">
             <span>{{ job.salary_text or "Salary not stated" }}</span>
             <span>{{ application_statuses.get(job.application_status, job.application_status) }}</span>
+            {% if job.expiry_status == "expired" %}
+              <span class="vacancy-badge vacancy-closed">Expired or closed</span>
+            {% elif job.link_status == "broken" %}
+              <span class="vacancy-badge vacancy-closed">Broken vacancy link</span>
+            {% elif job.link_status == "active" %}
+              <span class="vacancy-badge vacancy-open">Link verified</span>
+            {% else %}
+              <span class="vacancy-badge vacancy-unknown">Link unverified</span>
+            {% endif %}
             {% if job.has_documents %}<span class="ready-pill">CV ready</span>{% endif %}
           </div>
           <div class="reason-list">
@@ -137,7 +146,7 @@
           </div>
           <div class="card-actions">
             <a class="text-link" href="/jobs/{{ job.id }}">Review & tailor <span>→</span></a>
-            <a class="external-link" href="{{ job.vacancy_url }}" target="_blank" rel="noopener">Original advert ↗</a>
+            <a class="external-link" href="{{ job.resolved_vacancy_url or job.vacancy_url }}" target="_blank" rel="noopener">Original advert ↗</a>
           </div>
         </article>
       {% else %}

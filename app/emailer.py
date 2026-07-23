@@ -16,6 +16,7 @@ def parse_recipients(value: str) -> list[str]:
 def _render_job_table(jobs: list[dict[str, Any]], *, possible: bool = False) -> str:
     rows = []
     for job in jobs:
+        vacancy_url = job.get("resolved_vacancy_url") or job["vacancy_url"]
         reasons = job.get("fit_reasons") or []
         if isinstance(reasons, str):
             reasons = [reasons]
@@ -42,7 +43,7 @@ def _render_job_table(jobs: list[dict[str, Any]], *, possible: bool = False) -> 
             f"""
             <tr>
               <td>
-                <a href="{html.escape(str(job['vacancy_url']), quote=True)}">
+                <a href="{html.escape(str(vacancy_url), quote=True)}">
                   {html.escape(str(job['title']))}
                 </a><br>
                 <strong>{html.escape(str(job['employer']))}</strong><br>

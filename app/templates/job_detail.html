@@ -20,6 +20,13 @@
           <span><small>Salary</small>{{ job.salary_text or "Not stated" }}</span>
           <span><small>Career track</small>{{ (job.career_track or "Cross-functional")|replace("_", " ")|title }}</span>
           <span><small>Found</small>{{ job.first_seen_at.strftime("%d %b %Y") }}</span>
+          <span>
+            <small>Vacancy status</small>
+            {% if job.expiry_status == "expired" %}Expired or closed
+            {% elif job.link_status == "broken" %}Broken link
+            {% elif job.link_status == "active" %}Link verified
+            {% else %}Unable to verify{% endif %}
+          </span>
         </div>
       </div>
       <div class="large-score" style="--score: {{ job.fit_score }}">
@@ -74,14 +81,19 @@
         <section class="action-card">
           <span class="eyebrow">Application pack</span>
           <h2>Tailor your CV</h2>
-          <p>Create an ATS-friendly CV, cover letter and review notes using only verified facts from your profile.</p>
-          <form method="post" action="/jobs/{{ job.id }}/tailor" data-tailor-form>
-            <button class="button button-accent full-width" type="submit">
-              <span class="button-label">{% if documents %}Create a new version{% else %}Create tailored documents{% endif %}</span>
-              <span class="button-loading">Creating…</span>
-            </button>
-          </form>
-          <small>This uses the OpenAI API and may take around a minute.</small>
+          {% if job.expiry_status == "expired" or job.link_status == "broken" %}
+            <p>This vacancy is no longer open, so paid document tailoring has been disabled.</p>
+            <button class="button button-accent full-width" type="button" disabled>Tailoring unavailable</button>
+          {% else %}
+            <p>Create an ATS-friendly CV, cover letter and review notes using only verified facts from your profile.</p>
+            <form method="post" action="/jobs/{{ job.id }}/tailor" data-tailor-form>
+              <button class="button button-accent full-width" type="submit">
+                <span class="button-label">{% if documents %}Create a new version{% else %}Create tailored documents{% endif %}</span>
+                <span class="button-loading">Creating…</span>
+              </button>
+            </form>
+            <small>The vacancy is checked again before the OpenAI API is called.</small>
+          {% endif %}
         </section>
 
         <section class="action-card">
@@ -96,7 +108,7 @@
               </select>
             </label>
           </form>
-          <a class="button button-outline full-width" href="{{ job.vacancy_url }}" target="_blank" rel="noopener">Open original vacancy ↗</a>
+          <a class="button button-outline full-width" href="{{ job.resolved_vacancy_url or job.vacancy_url }}" target="_blank" rel="noopener">Open original vacancy ↗</a>
         </section>
 
         {% if documents %}

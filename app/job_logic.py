@@ -29,6 +29,10 @@ def canonical_key(job: dict[str, Any]) -> str:
 
 
 def qualification_status(job: dict[str, Any], min_fit_score: int) -> str:
+    if job.get("expiry_status") == "expired":
+        return "rejected_expired"
+    if job.get("link_status") == "broken":
+        return "rejected_broken_link"
     if job.get("sponsorship_exclusion"):
         return "rejected_sponsorship_excluded"
     if not job.get("sponsor_register_match"):
@@ -44,6 +48,14 @@ def qualification_status(job: dict[str, Any], min_fit_score: int) -> str:
     return "qualified_possible"
 
 
+def sponsorship_tier(qualification: str) -> str:
+    if qualification == "qualified_confirmed":
+        return "confirmed"
+    if qualification == "qualified_possible":
+        return "possible"
+    return "rejected"
+
+
 def prepare_job(
     raw: dict[str, Any],
     *,
@@ -57,8 +69,12 @@ def prepare_job(
         "salary_text": str(raw.get("salary_text", "")).strip() or None,
         "source_name": str(raw.get("source_name", "")).strip() or None,
         "vacancy_url": canonicalise_url(str(raw.get("vacancy_url", ""))),
+        "resolved_vacancy_url": str(raw.get("resolved_vacancy_url", "")).strip()
+        or None,
+        "link_status": str(raw.get("link_status", "unverified")).strip(),
         "posted_at": str(raw.get("posted_at", "")).strip() or None,
         "closing_at": str(raw.get("closing_at", "")).strip() or None,
+        "expiry_status": str(raw.get("expiry_status", "unknown")).strip(),
         "summary": str(raw.get("summary", "")).strip() or None,
         "career_track": str(raw.get("career_track", "")).strip() or None,
         "fit_score": max(0, min(100, int(raw.get("fit_score", 0)))),
@@ -82,10 +98,5 @@ def prepare_job(
     }
     job["canonical_key"] = canonical_key(job)
     job["qualification_status"] = qualification_status(job, min_fit_score)
-    if job["qualification_status"] == "qualified_confirmed":
-        job["sponsorship_tier"] = "confirmed"
-    elif job["qualification_status"] == "qualified_possible":
-        job["sponsorship_tier"] = "possible"
-    else:
-        job["sponsorship_tier"] = "rejected"
+    job["sponsorship_tier"] = sponsorship_tier(job["qualification_status"])
     return job
