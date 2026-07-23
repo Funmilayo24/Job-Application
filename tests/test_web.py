@@ -36,6 +36,10 @@ def test_login_protects_dashboard_and_accepts_configured_user(
     monkeypatch.setenv("DASHBOARD_PASSWORD_1", "correct-password")
     client = TestClient(web.app)
 
+    login_page = client.get("/login")
+    assert 'href="/static/style.css"' in login_page.text
+    assert 'src="/static/app.js"' in login_page.text
+
     protected = client.get("/", follow_redirects=False)
     assert protected.status_code == 303
     assert protected.headers["location"].startswith("/login")
