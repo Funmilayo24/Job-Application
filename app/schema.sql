@@ -23,6 +23,20 @@ CREATE TABLE IF NOT EXISTS search_runs (
     error_message TEXT
 );
 
+CREATE TABLE IF NOT EXISTS manual_search_requests (
+    id BIGSERIAL PRIMARY KEY,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    requested_by TEXT NOT NULL,
+    started_at TIMESTAMPTZ,
+    finished_at TIMESTAMPTZ,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS manual_search_requests_status_idx
+    ON manual_search_requests (status, requested_at);
+
 CREATE TABLE IF NOT EXISTS jobs (
     id BIGSERIAL PRIMARY KEY,
     canonical_key TEXT NOT NULL UNIQUE,

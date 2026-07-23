@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 import secrets
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, RedirectResponse
@@ -94,6 +96,22 @@ def resolve_artifact_path(stored_path: str) -> Path:
     return resolved
 
 
+def next_scheduled_search(
+    settings: Settings,
+    *,
+    now: datetime | None = None,
+) -> datetime:
+    timezone = ZoneInfo(settings.timezone)
+    current = (now or datetime.now(UTC)).astimezone(timezone)
+    for day_offset in (0, 1):
+        day = current.date() + timedelta(days=day_offset)
+        for hour in settings.search_hours:
+            candidate = datetime.combine(day, time(hour=hour), tzinfo=timezone)
+            if candidate > current:
+                return candidate
+    raise RuntimeError("No scheduled search time is configured")
+
+
 @app.get("/login")
 def login_page(
     request: Request,
@@ -148,8 +166,15 @@ def dashboard(
     qualification: str = Query(default="qualified", max_length=50),
     application: str = Query(default="", max_length=50),
     message: str = Query(default="", max_length=200),
+    error: str = Query(default="", max_length=300),
 ):
     database = _database()
+    settings = _settings()
+    manual_search = database.manual_search_status()
+    if manual_search["latest_run_at"]:
+        manual_search["latest_run_local"] = manual_search["latest_run_at"].astimezone(
+            ZoneInfo(settings.timezone)
+        )
     jobs = database.dashboard_jobs(
         query=q.strip(),
         qualification=qualification,
@@ -166,7 +191,26 @@ def dashboard(
             "application": application,
             "application_statuses": APPLICATION_STATUSES,
             "message": message,
+            "error": error,
+            "manual_search": manual_search,
+            "next_scheduled_search": next_scheduled_search(settings),
         },
+    )
+
+
+@app.post("/search/manual")
+def request_manual_search(
+    _user: Annotated[str | None, Depends(require_user)],
+):
+    result = _database().queue_manual_search(_user or "local-user")
+    if not result["accepted"]:
+        return RedirectResponse(
+            f"/?error={quote(str(result['reason']))}",
+            status_code=303,
+        )
+    return _redirect(
+        "/",
+        "Search queued. The worker will start it within about one minute.",
     )
 
 

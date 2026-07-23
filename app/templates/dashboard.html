@@ -14,6 +14,58 @@
   </section>
 
   {% if message %}<div class="toast shell">{{ message }}</div>{% endif %}
+  {% if error %}<div class="toast toast-error shell">{{ error }}</div>{% endif %}
+
+  <section class="search-control shell">
+    <div>
+      <span class="eyebrow">Search schedule</span>
+      <h2>Fresh opportunities, without surprise API spend.</h2>
+      <div class="search-timing">
+        <span>
+          <small>Last search</small>
+          <strong>
+            {% if manual_search.latest_run_local %}
+              {{ manual_search.latest_run_local.strftime("%d %b, %H:%M") }} UK time
+            {% else %}
+              Not run yet
+            {% endif %}
+          </strong>
+        </span>
+        <span>
+          <small>Next automatic search</small>
+          <strong>{{ next_scheduled_search.strftime("%d %b, %H:%M") }} UK time</strong>
+        </span>
+      </div>
+    </div>
+    <div class="manual-search-action">
+      <form method="post" action="/search/manual" data-manual-search-form>
+        <button
+          class="button button-accent"
+          type="submit"
+          {% if not manual_search.can_request %}disabled{% endif %}
+        >
+          {% if manual_search.active_request and manual_search.active_request.status == "running" %}
+            Search running
+          {% elif manual_search.active_request %}
+            Search queued
+          {% else %}
+            Search now
+          {% endif %}
+        </button>
+      </form>
+      {% if manual_search.reason %}
+        <small>{{ manual_search.reason }}</small>
+      {% elif manual_search.can_request %}
+        <small>Uses paid APIs. Limited to one manual search every 24 hours.</small>
+      {% endif %}
+      {% if manual_search.next_allowed_at and not manual_search.active_request %}
+        <small
+          class="search-countdown"
+          data-countdown-to="{{ manual_search.next_allowed_at.isoformat() }}"
+        ></small>
+      {% endif %}
+    </div>
+  </section>
 
   <section class="metrics shell">
     <article><span>Qualified</span><strong>{{ metrics.qualified }}</strong><small>ready to review</small></article>

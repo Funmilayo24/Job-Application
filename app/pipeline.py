@@ -24,6 +24,10 @@ class RunResult:
     emailed: int
 
 
+class SearchAlreadyRunningError(RuntimeError):
+    pass
+
+
 class JobPipeline:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -51,6 +55,12 @@ class JobPipeline:
 
     def run(self) -> RunResult:
         self.db.initialise()
+        with self.db.search_lock() as acquired:
+            if not acquired:
+                raise SearchAlreadyRunningError("Another search is already running")
+            return self._run_locked()
+
+    def _run_locked(self) -> RunResult:
         run_id = self.db.start_run()
         discovered = qualified = emailed = 0
         try:

@@ -3,11 +3,71 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+
+SEARCH_LOCK_KEY = 8_240_724_901
+MANUAL_QUEUE_LOCK_KEY = 8_240_724_902
+MANUAL_COOLDOWN = timedelta(hours=24)
+SEARCH_FRESHNESS = timedelta(hours=6)
+
+
+def evaluate_manual_search_limits(
+    *,
+    now: datetime,
+    latest_run_at: datetime | None,
+    latest_manual_at: datetime | None,
+    active_request: dict[str, Any] | None,
+) -> dict[str, Any]:
+    next_allowed_candidates: list[tuple[datetime, str]] = []
+    if latest_run_at:
+        next_allowed_candidates.append(
+            (
+                latest_run_at + SEARCH_FRESHNESS,
+                "Please wait at least six hours after the last search.",
+            )
+        )
+    if latest_manual_at:
+        next_allowed_candidates.append(
+            (
+                latest_manual_at + MANUAL_COOLDOWN,
+                "Only one manual search is allowed every 24 hours.",
+            )
+        )
+
+    future_limits = [
+        (allowed_at, reason)
+        for allowed_at, reason in next_allowed_candidates
+        if allowed_at > now
+    ]
+    next_allowed_at = max(
+        (allowed_at for allowed_at, _reason in future_limits),
+        default=None,
+    )
+    reason = ""
+    if active_request:
+        state = str(active_request["status"])
+        reason = "A manual search is running." if state == "running" else "A search is queued."
+    elif next_allowed_at:
+        reason = next(
+            limit_reason
+            for allowed_at, limit_reason in future_limits
+            if allowed_at == next_allowed_at
+        )
+
+    return {
+        "can_request": not active_request and next_allowed_at is None,
+        "reason": reason,
+        "next_allowed_at": next_allowed_at,
+        "active_request": active_request,
+        "latest_run_at": latest_run_at,
+        "latest_manual_at": latest_manual_at,
+        "server_now": now,
+    }
 
 
 class Database:
@@ -23,6 +83,20 @@ class Database:
         schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
         with self.connect() as connection, connection.cursor() as cursor:
             cursor.execute(schema)
+
+    @contextmanager
+    def search_lock(self) -> Iterator[bool]:
+        with self.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_try_advisory_lock(%s) AS acquired",
+                (SEARCH_LOCK_KEY,),
+            )
+            acquired = bool(cursor.fetchone()["acquired"])
+            try:
+                yield acquired
+            finally:
+                if acquired:
+                    cursor.execute("SELECT pg_advisory_unlock(%s)", (SEARCH_LOCK_KEY,))
 
     def start_run(self) -> int:
         with self.connect() as connection, connection.cursor() as cursor:
@@ -48,6 +122,137 @@ class Database:
                 WHERE id = %s
                 """,
                 (status, discovered, qualified, emailed, error, run_id),
+            )
+
+    @staticmethod
+    def _manual_search_status(cursor: psycopg.Cursor) -> dict[str, Any]:
+        cursor.execute("SELECT now() AS server_now")
+        now = cursor.fetchone()["server_now"]
+        cursor.execute(
+            """
+            SELECT started_at
+            FROM search_runs
+            ORDER BY started_at DESC
+            LIMIT 1
+            """
+        )
+        latest_run = cursor.fetchone()
+        cursor.execute(
+            """
+            SELECT requested_at
+            FROM manual_search_requests
+            ORDER BY requested_at DESC
+            LIMIT 1
+            """
+        )
+        latest_manual = cursor.fetchone()
+        cursor.execute(
+            """
+            SELECT id, status, requested_at, requested_by, started_at
+            FROM manual_search_requests
+            WHERE status IN ('pending', 'running')
+            ORDER BY requested_at
+            LIMIT 1
+            """
+        )
+        active_request = cursor.fetchone()
+        return evaluate_manual_search_limits(
+            now=now,
+            latest_run_at=latest_run["started_at"] if latest_run else None,
+            latest_manual_at=latest_manual["requested_at"] if latest_manual else None,
+            active_request=active_request,
+        )
+
+    def manual_search_status(self) -> dict[str, Any]:
+        with self.connect() as connection, connection.cursor() as cursor:
+            return self._manual_search_status(cursor)
+
+    def queue_manual_search(self, requested_by: str) -> dict[str, Any]:
+        with self.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(%s)",
+                (MANUAL_QUEUE_LOCK_KEY,),
+            )
+            status = self._manual_search_status(cursor)
+            if not status["can_request"]:
+                return {"accepted": False, **status}
+            cursor.execute(
+                """
+                INSERT INTO manual_search_requests (requested_by)
+                VALUES (%s)
+                RETURNING id, status, requested_at, requested_by
+                """,
+                (requested_by,),
+            )
+            request = cursor.fetchone()
+            return {
+                "accepted": True,
+                **status,
+                "active_request": request,
+            }
+
+    def claim_manual_search(self) -> dict[str, Any] | None:
+        with self.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE manual_search_requests
+                SET status = 'pending', started_at = NULL
+                WHERE status = 'running'
+                  AND started_at < now() - interval '2 hours'
+                """
+            )
+            cursor.execute(
+                """
+                SELECT id, requested_at, requested_by
+                FROM manual_search_requests
+                WHERE status = 'pending'
+                ORDER BY requested_at
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+                """
+            )
+            request = cursor.fetchone()
+            if not request:
+                return None
+            cursor.execute(
+                """
+                UPDATE manual_search_requests
+                SET status = 'running', started_at = now(), error_message = NULL
+                WHERE id = %s
+                RETURNING id, status, requested_at, requested_by, started_at
+                """,
+                (request["id"],),
+            )
+            return cursor.fetchone()
+
+    def finish_manual_search(
+        self,
+        request_id: int,
+        *,
+        status: str,
+        error: str | None = None,
+    ) -> None:
+        if status not in {"completed", "failed"}:
+            raise ValueError("Manual search status must be completed or failed")
+        with self.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE manual_search_requests
+                SET status = %s, finished_at = now(), error_message = %s
+                WHERE id = %s
+                """,
+                (status, error, request_id),
+            )
+
+    def requeue_manual_search(self, request_id: int) -> None:
+        with self.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE manual_search_requests
+                SET status = 'pending', started_at = NULL
+                WHERE id = %s AND status = 'running'
+                """,
+                (request_id,),
             )
 
     def replace_sponsors(self, rows: list[dict[str, str]]) -> None:

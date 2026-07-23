@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -62,3 +63,36 @@ def test_login_protects_dashboard_and_accepts_configured_user(
     assert accepted.status_code == 303
     assert accepted.headers["location"] == "/"
     assert "session" in accepted.cookies
+
+
+def test_manual_search_request_is_queued_by_authenticated_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeDatabase:
+        requested_by = ""
+
+        def queue_manual_search(self, requested_by: str) -> dict:
+            self.requested_by = requested_by
+            return {"accepted": True}
+
+    database = FakeDatabase()
+    monkeypatch.setattr(web, "_database", lambda: database)
+    response = web.request_manual_search("owner")
+    assert response.status_code == 303
+    assert "Search%20queued" in response.headers["location"]
+    assert database.requested_by == "owner"
+
+
+def test_manual_search_request_reports_server_side_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = SimpleNamespace(
+        queue_manual_search=lambda _user: {
+            "accepted": False,
+            "reason": "Only one manual search is allowed every 24 hours.",
+        }
+    )
+    monkeypatch.setattr(web, "_database", lambda: database)
+    response = web.request_manual_search("sister")
+    assert response.status_code == 303
+    assert "Only%20one%20manual%20search" in response.headers["location"]

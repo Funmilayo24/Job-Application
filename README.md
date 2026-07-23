@@ -196,6 +196,11 @@ The dashboard supports two private accounts through `DASHBOARD_USER_1`,
 strong `DASHBOARD_SESSION_SECRET` and set `DASHBOARD_SECURE_COOKIES=true` before
 exposing the web service.
 
+The dashboard's **Search now** action places a request in PostgreSQL for the worker
+to process. It is limited server-side to one manual request every 24 hours, requires
+at least six hours since the latest search, and cannot overlap another run. Scheduled
+08:00 and 18:00 searches continue independently.
+
 ## Cost controls
 
 - Discovery uses GPT-5.6 Luna.
