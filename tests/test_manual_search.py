@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from app.db import evaluate_manual_search_limits
 from app.web import next_scheduled_search
-from app.worker import process_manual_search
+from app.worker import process_manual_search, search_trigger
 
 
 def test_manual_search_is_available_without_recent_history() -> None:
@@ -49,6 +49,15 @@ def test_next_scheduled_search_uses_london_time() -> None:
     next_run = next_scheduled_search(settings, now=now)
     assert next_run.hour == 18
     assert next_run.tzname() == "BST"
+
+
+def test_worker_cron_trigger_explicitly_uses_london_timezone() -> None:
+    settings = SimpleNamespace(timezone="Europe/London", search_hours=(8, 18))
+    trigger = search_trigger(settings)
+    now = datetime(2026, 7, 23, 16, 59, tzinfo=UTC)
+    next_run = trigger.get_next_fire_time(None, now)
+    assert next_run == datetime(2026, 7, 23, 18, 0, tzinfo=next_run.tzinfo)
+    assert next_run.astimezone(UTC).hour == 17
 
 
 def test_worker_completes_a_queued_manual_search() -> None:

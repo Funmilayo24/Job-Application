@@ -14,7 +14,33 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+
+def search_trigger(settings: Settings) -> CronTrigger:
+    return CronTrigger(
+        hour=",".join(map(str, settings.search_hours)),
+        minute=0,
+        timezone=settings.timezone,
+    )
+
+
+def process_scheduled_search(pipeline: JobPipeline) -> None:
+    logger.info("Starting scheduled job search")
+    try:
+        result = pipeline.run()
+    except SearchAlreadyRunningError:
+        logger.warning("Scheduled search skipped because another search is already running")
+    except Exception:
+        logger.exception("Scheduled job search failed")
+    else:
+        logger.info(
+            "Scheduled search completed: discovered=%s qualified=%s emailed=%s",
+            result.discovered,
+            result.qualified,
+            result.emailed,
+        )
 
 
 def process_manual_search(pipeline: JobPipeline) -> None:
@@ -54,8 +80,9 @@ def main() -> None:
 
     scheduler = BlockingScheduler(timezone=settings.timezone)
     scheduler.add_job(
-        pipeline.run,
-        CronTrigger(hour=",".join(map(str, settings.search_hours)), minute=0),
+        process_scheduled_search,
+        search_trigger(settings),
+        args=[pipeline],
         id="uk-sponsorship-search",
         name="UK sponsorship job search",
         max_instances=1,
