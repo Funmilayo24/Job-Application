@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Sign in · SponsorPath{% endblock %}
+{% block content %}
+  <section class="login-shell">
+    <div class="login-card">
+      <span class="eyebrow">Private dashboard</span>
+      <h1>Welcome back.</h1>
+      <p>Sign in to review sponsorship matches and create tailored application documents.</p>
+      {% if error %}<div class="toast toast-error">{{ error }}</div>{% endif %}
+      <form method="post" action="/login">
+        <input type="hidden" name="next_path" value="{{ next_path }}">
+        <label>
+          <span>Username</span>
+          <input name="username" autocomplete="username" required autofocus>
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="button button-accent full-width" type="submit">Sign in</button>
+      </form>
+      <small>Access is limited to configured family accounts.</small>
+    </div>
+  </section>
+{% endblock %}

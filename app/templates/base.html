@@ -17,7 +17,12 @@
       </a>
       <div class="header-note">
         <span class="live-dot"></span>
-        UK sponsorship search
+        {% if request.session.get("user") %}
+          <span>{{ request.session.get("user") }}</span>
+          <form method="post" action="/logout"><button class="logout-button" type="submit">Sign out</button></form>
+        {% else %}
+          UK sponsorship search
+        {% endif %}
       </div>
     </header>
     <main>{% block content %}{% endblock %}</main>

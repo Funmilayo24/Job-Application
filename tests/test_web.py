@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 import app.web as web
 
@@ -26,3 +27,34 @@ def test_resolve_artifact_path_rejects_file_outside_artifact_root(
     monkeypatch.setattr(web, "ARTIFACT_ROOT", root.resolve())
     with pytest.raises(ValueError):
         web.resolve_artifact_path(str(outside))
+
+
+def test_login_protects_dashboard_and_accepts_configured_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DASHBOARD_USER_1", "owner")
+    monkeypatch.setenv("DASHBOARD_PASSWORD_1", "correct-password")
+    client = TestClient(web.app)
+
+    protected = client.get("/", follow_redirects=False)
+    assert protected.status_code == 303
+    assert protected.headers["location"].startswith("/login")
+
+    rejected = client.post(
+        "/login",
+        data={"username": "owner", "password": "wrong", "next_path": "/"},
+    )
+    assert rejected.status_code == 401
+
+    accepted = client.post(
+        "/login",
+        data={
+            "username": "owner",
+            "password": "correct-password",
+            "next_path": "/",
+        },
+        follow_redirects=False,
+    )
+    assert accepted.status_code == 303
+    assert accepted.headers["location"] == "/"
+    assert "session" in accepted.cookies

@@ -43,6 +43,8 @@ a { color: inherit; }
   color: var(--lime); background: var(--green-dark); font-size: 13px; letter-spacing: -.03em;
 }
 .header-note { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; }
+.header-note form { margin: 0 0 0 4px; }
+.logout-button { border: 0; background: transparent; color: var(--green); font: 700 12px "DM Sans"; cursor: pointer; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #48a77e; box-shadow: 0 0 0 5px rgba(72,167,126,.13); }
 .hero { min-height: 390px; display: flex; align-items: center; justify-content: space-between; gap: 60px; padding-block: 70px 54px; }
 .eyebrow { color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
@@ -163,6 +165,12 @@ dd { margin: 4px 0 0; font-size: 13px; }
 .document-version { padding: 14px 0; border-top: 1px solid var(--line); display: grid; gap: 8px; }
 .document-version > span { color: var(--muted); font-size: 10px; }
 .document-version a { display: flex; justify-content: space-between; text-decoration: none; color: var(--green); font-size: 13px; font-weight: 700; }
+.login-shell { min-height: calc(100vh - 168px); padding: 70px 20px; display: grid; place-items: center; }
+.login-card { width: min(440px, 100%); padding: 42px; border: 1px solid var(--line); border-radius: 24px; background: var(--paper); box-shadow: var(--shadow); }
+.login-card h1 { margin: 13px 0 12px; font-size: 42px; }
+.login-card > p { color: var(--muted); line-height: 1.65; }
+.login-card form { display: grid; gap: 17px; margin-top: 28px; }
+.login-card small { display: block; margin-top: 17px; color: var(--muted); text-align: center; }
 footer { min-height: 90px; padding: 25px max(20px, calc((100vw - 1180px) / 2)); display: flex; justify-content: space-between; align-items: center; color: var(--muted); border-top: 1px solid var(--line); font-size: 12px; }
 footer span:first-child { color: var(--ink); font: 800 16px "Manrope"; }
 
@@ -190,5 +198,6 @@ footer span:first-child { color: var(--ink); font: 800 16px "Manrope"; }
   .large-score { margin-top: 30px; width: 120px; height: 120px; }
   .detail-facts { flex-wrap: wrap; gap: 20px; }
   .panel, .action-card { padding: 22px; }
+  .login-card { padding: 30px 22px; }
   footer { align-items: flex-start; gap: 12px; flex-direction: column; }
 }

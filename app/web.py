@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import os
+import secrets
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import FastAPI, Form, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import Settings
 from app.db import Database
@@ -27,18 +30,50 @@ APPLICATION_STATUSES = {
 }
 
 app = FastAPI(title="SponsorPath", docs_url=None, redoc_url=None)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("DASHBOARD_SESSION_SECRET") or secrets.token_urlsafe(32),
+    same_site="lax",
+    https_only=os.getenv("DASHBOARD_SECURE_COOKIES", "").lower()
+    in {"1", "true", "yes", "on"},
+)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
 def _settings() -> Settings:
-    return Settings.from_env()
+    # The dashboard does not send email or discover jobs, so it should not
+    # require the worker-only Resend and job-board credentials.
+    return Settings.from_env(require_secrets=False)
 
 
 def _database() -> Database:
     database = Database(_settings().database_url)
     database.initialise()
     return database
+
+
+def _configured_users() -> dict[str, str]:
+    users: dict[str, str] = {}
+    for index in (1, 2):
+        username = os.getenv(f"DASHBOARD_USER_{index}", "").strip()
+        password = os.getenv(f"DASHBOARD_PASSWORD_{index}", "")
+        if username and password:
+            users[username] = password
+    return users
+
+
+def require_user(request: Request) -> str | None:
+    users = _configured_users()
+    if not users:
+        return None
+    username = str(request.session.get("user") or "")
+    if username in users:
+        return username
+    raise HTTPException(
+        status_code=303,
+        headers={"Location": f"/login?next={quote(request.url.path)}"},
+    )
 
 
 def _redirect(path: str, message: str) -> RedirectResponse:
@@ -59,9 +94,56 @@ def resolve_artifact_path(stored_path: str) -> Path:
     return resolved
 
 
+@app.get("/login")
+def login_page(
+    request: Request,
+    next_path: str = Query(default="/", alias="next", max_length=200),
+    error: str = Query(default="", max_length=200),
+):
+    if not _configured_users():
+        return RedirectResponse("/", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"next_path": next_path, "error": error},
+    )
+
+
+@app.post("/login")
+def login(
+    request: Request,
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+    next_path: Annotated[str, Form()] = "/",
+):
+    users = _configured_users()
+    expected = users.get(username)
+    if expected is None or not secrets.compare_digest(password, expected):
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "next_path": next_path,
+                "error": "The username or password is incorrect.",
+            },
+            status_code=401,
+        )
+    request.session.clear()
+    request.session["user"] = username
+    destination = next_path if next_path.startswith("/") and not next_path.startswith("//") else "/"
+    return RedirectResponse(destination, status_code=303)
+
+
+@app.post("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/login", status_code=303)
+
+
 @app.get("/")
 def dashboard(
     request: Request,
+    _user: Annotated[str | None, Depends(require_user)],
     q: str = Query(default="", max_length=100),
     qualification: str = Query(default="qualified", max_length=50),
     application: str = Query(default="", max_length=50),
@@ -92,6 +174,7 @@ def dashboard(
 def job_detail(
     request: Request,
     job_id: int,
+    _user: Annotated[str | None, Depends(require_user)],
     message: str = Query(default="", max_length=200),
     error: str = Query(default="", max_length=300),
 ):
@@ -116,6 +199,7 @@ def job_detail(
 def update_status(
     job_id: int,
     status: Annotated[str, Form()],
+    _user: Annotated[str | None, Depends(require_user)],
 ):
     if status not in APPLICATION_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid application status")
@@ -125,8 +209,16 @@ def update_status(
 
 
 @app.post("/jobs/{job_id}/tailor")
-def tailor_job(job_id: int):
+def tailor_job(
+    job_id: int,
+    _user: Annotated[str | None, Depends(require_user)],
+):
     settings = _settings()
+    if not settings.openai_api_key:
+        return RedirectResponse(
+            f"/jobs/{job_id}?error={quote('OPENAI_API_KEY is not configured')}",
+            status_code=303,
+        )
     database = Database(settings.database_url)
     database.initialise()
     job = database.get_job(job_id)
@@ -168,7 +260,11 @@ def tailor_job(job_id: int):
 
 
 @app.get("/documents/{document_id}/{kind}")
-def download_document(document_id: int, kind: str):
+def download_document(
+    document_id: int,
+    kind: str,
+    _user: Annotated[str | None, Depends(require_user)],
+):
     columns = {
         "cv": ("cv_path", "tailored-cv.docx"),
         "cover-letter": ("cover_letter_path", "cover-letter.docx"),

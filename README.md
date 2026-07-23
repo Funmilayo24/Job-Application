@@ -191,8 +191,10 @@ and dates reflect the confirmed source facts:
 The generated files intentionally omit personal contact details. Preserve the contact
 header from the original CV when preparing the final submission.
 
-The dashboard currently has no login because it is local-only. Add authentication
-before exposing the web service publicly on Railway.
+The dashboard supports two private accounts through `DASHBOARD_USER_1`,
+`DASHBOARD_PASSWORD_1`, `DASHBOARD_USER_2` and `DASHBOARD_PASSWORD_2`. Configure a
+strong `DASHBOARD_SESSION_SECRET` and set `DASHBOARD_SECURE_COOKIES=true` before
+exposing the web service.
 
 ## Cost controls
 
@@ -211,14 +213,24 @@ before exposing the web service publicly on Railway.
 Use the OpenAI Platform billing page to set usage notifications or limits and review
 actual spend after the first week.
 
-## Railway migration
+## Railway deployment
 
-The same container can later run on Railway with:
+Create one Railway project containing PostgreSQL and two services connected to this
+GitHub repository:
 
-1. a Railway PostgreSQL service;
-2. the worker service built from this repository;
-3. the `.env` values stored as Railway service variables;
-4. `DATABASE_URL` set to Railway's PostgreSQL connection URL;
-5. a persistent worker process running `python -m app.worker`.
+1. `web`: custom start command
+   `sh -c 'uvicorn app.web:app --host 0.0.0.0 --port $PORT'`, healthcheck `/health`,
+   a Railway-provided domain, and a volume mounted at `/app/artifacts`. Set
+   `RAILWAY_RUN_UID=0` because Railway mounts volumes as root.
+2. `worker`: custom start command `python -m app.worker`, no public domain and
+   Serverless disabled.
 
-Do not upload the local `.env` file or PostgreSQL volume.
+Both services must reference the Railway PostgreSQL `DATABASE_URL`. Put the API,
+email, search and dashboard values from `.env.example` into Railway variables rather
+than uploading `.env`. The web service needs the database, OpenAI and dashboard
+variables; the worker needs the database, OpenAI, Resend, Adzuna, Reed, email and
+schedule variables.
+
+Use two distinct dashboard usernames and passwords, a long random session secret, and
+`DASHBOARD_SECURE_COOKIES=true`. The Railway domain is sufficient; a custom domain is
+not required.
