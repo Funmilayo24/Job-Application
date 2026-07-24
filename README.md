@@ -16,8 +16,10 @@ the official UK Skilled Worker sponsor register, applies a conservative salary-r
 gate, and emails new vacancies in two clearly labelled tiers.
 
 Discovery combines separate AI web searches for each career track with structured,
-paginated Adzuna and Reed searches. Results are source-labelled, deduplicated across
-job boards and employer sites, and reviewed against the same CV and sponsorship rules.
+paginated Adzuna and Reed searches. The web pass explicitly prioritises official NHS
+Jobs and externally advertised Civil Service Jobs vacancies. Results are
+source-labelled, deduplicated across job boards and employer sites, and reviewed
+against the same CV and sponsorship rules.
 
 It does **not** scrape logged-in LinkedIn or Indeed accounts, submit applications, or
 invent CV facts. A person must review each vacancy and every generated document before
@@ -211,6 +213,8 @@ runs again before paid CV tailoring.
 
 - Discovery uses GPT-5.6 Luna.
 - Customer/operations and product/delivery are searched separately at medium web depth.
+- Each web pass explicitly checks NHS Jobs and external Civil Service Jobs listings
+  without treating public-sector affiliation as proof of sponsorship.
 - Six focused Adzuna queries run per search and remain within its default personal-use
   request limits at the twice-daily schedule.
 - Six direct-employer Reed queries run per search using the Jobseeker API.

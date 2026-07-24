@@ -123,6 +123,7 @@ class OpenAIJobService:
 
     def discover_jobs(self, max_jobs: int) -> list[dict[str, Any]]:
         tracks = self.search_config["career_tracks"]
+        priority_sources = self.search_config.get("priority_sources", [])
         per_track = max(1, (max_jobs + len(tracks) - 1) // len(tracks))
         jobs: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -133,6 +134,16 @@ Find up to {per_track} currently open UK vacancies matching this career track:
 
 Search employer career sites and public job listings. Do not automate or access a
 logged-in LinkedIn or Indeed account.
+
+PRIORITY OFFICIAL SOURCES:
+{json.dumps(priority_sources, ensure_ascii=False)}
+- Search these official sources explicitly for every career track, alongside the wider
+  web search. Use site-specific searches for the configured domains where useful.
+- Set source_name to the configured source name when a vacancy is found there.
+- Include a priority-source vacancy only when it satisfies the same responsibility,
+  vacancy-status, salary and sponsorship-evidence standards as every other result.
+- NHS or Civil Service affiliation is not evidence that the individual vacancy offers
+  sponsorship. Preserve explicit exclusions and silence exactly as described below.
 
 SPONSORSHIP SEARCH POLICY:
 - Return two kinds of strong CV matches: vacancies that explicitly offer Skilled

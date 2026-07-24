@@ -5,6 +5,20 @@
     "include_adjacent_titles": true,
     "require_responsibility_match": true
   },
+  "priority_sources": [
+    {
+      "name": "NHS Jobs",
+      "domain": "jobs.nhs.uk",
+      "search_url": "https://www.jobs.nhs.uk/candidate/search",
+      "instructions": "Search NHS trusts and related employers for matching non-clinical roles. Treat each trust as the employer for sponsor-register matching, and do not assume sponsorship from NHS affiliation."
+    },
+    {
+      "name": "Civil Service Jobs",
+      "domain": "civilservicejobs.service.gov.uk",
+      "search_url": "https://www.civilservicejobs.service.gov.uk/csr/index.cgi",
+      "instructions": "Include only externally advertised vacancies open to the public. Check each advert's nationality, right-to-work and sponsorship wording; do not assume a department sponsors the role."
+    }
+  ],
   "career_tracks": [
     {
       "name": "customer_success_and_operations",

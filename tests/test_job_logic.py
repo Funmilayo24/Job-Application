@@ -101,3 +101,15 @@ def test_search_titles_are_semantic_seeds() -> None:
     assert "Head of Customer Service" in titles
     assert "Payments Product Manager" in titles
     assert "Project Support Officer" in titles
+
+
+def test_official_public_sector_sources_are_prioritised() -> None:
+    config = load_search_config()
+    sources = {
+        source["name"]: source["domain"]
+        for source in config["priority_sources"]
+    }
+    assert sources == {
+        "NHS Jobs": "jobs.nhs.uk",
+        "Civil Service Jobs": "civilservicejobs.service.gov.uk",
+    }
