@@ -1,6 +1,11 @@
 from types import SimpleNamespace
 
-from app.pipeline import JobPipeline, _deduplicate_jobs, _interleave_sources
+from app.pipeline import (
+    JobPipeline,
+    _deduplicate_jobs,
+    _interleave_sources,
+    _safe_provider_search,
+)
 
 
 def test_deduplicate_jobs_across_sources_by_role_and_employer() -> None:
@@ -55,3 +60,12 @@ def test_send_pending_emails_and_marks_jobs_without_searching() -> None:
     assert pipeline.send_pending() == 2
     assert pipeline.db.marked == [7, 8]
     assert pipeline.emailer.sent == [{"id": 7}, {"id": 8}]
+
+
+def test_provider_failure_isolated_without_logging_exception_message(caplog) -> None:
+    def failed_search() -> list[dict]:
+        raise RuntimeError("request contained secret-api-key")
+
+    assert _safe_provider_search("Example", failed_search) == []
+    assert "continuing with other sources (RuntimeError)" in caplog.text
+    assert "secret-api-key" not in caplog.text

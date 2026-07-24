@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.adzuna import AdzunaClient
@@ -78,10 +79,13 @@ class JobPipeline:
             remaining = self.settings.max_discovered_jobs - len(web_jobs)
             candidate_sources: list[list[dict]] = []
             if self.adzuna:
-                adzuna_candidates = self.adzuna.search(
-                    self.ai.search_config,
-                    results_per_query=self.settings.adzuna_results_per_query,
-                    max_candidates=self.settings.adzuna_max_candidates,
+                adzuna_candidates = _safe_provider_search(
+                    "Adzuna",
+                    lambda: self.adzuna.search(
+                        self.ai.search_config,
+                        results_per_query=self.settings.adzuna_results_per_query,
+                        max_candidates=self.settings.adzuna_max_candidates,
+                    ),
                 )
                 logger.info(
                     "Adzuna returned %s candidates",
@@ -89,10 +93,13 @@ class JobPipeline:
                 )
                 candidate_sources.append(adzuna_candidates)
             if self.reed:
-                reed_candidates = self.reed.search(
-                    self.ai.search_config,
-                    results_per_query=self.settings.reed_results_per_query,
-                    max_candidates=self.settings.reed_max_candidates,
+                reed_candidates = _safe_provider_search(
+                    "Reed",
+                    lambda: self.reed.search(
+                        self.ai.search_config,
+                        results_per_query=self.settings.reed_results_per_query,
+                        max_candidates=self.settings.reed_max_candidates,
+                    ),
                 )
                 logger.info("Reed returned %s candidates", len(reed_candidates))
                 candidate_sources.append(reed_candidates)
@@ -174,6 +181,23 @@ class JobPipeline:
         self.emailer.send_digest(jobs)
         self.db.mark_emailed([int(job["id"]) for job in jobs])
         return len(jobs)
+
+
+def _safe_provider_search(
+    source_name: str,
+    search: Callable[[], list[dict]],
+) -> list[dict]:
+    try:
+        return search()
+    except Exception as exc:
+        # Some HTTP exceptions include credential-bearing request URLs. Log only
+        # the exception type so an unexpected provider failure cannot leak keys.
+        logger.error(
+            "%s search failed unexpectedly; continuing with other sources (%s)",
+            source_name,
+            type(exc).__name__,
+        )
+        return []
 
 
 def _deduplicate_jobs(jobs: list[dict]) -> list[dict]:

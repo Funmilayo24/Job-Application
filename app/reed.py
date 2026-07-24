@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
+
+from app.http_retry import SourceRequestError, request_with_retries
+
+logger = logging.getLogger(__name__)
 
 
 class ReedClient:
@@ -13,9 +18,13 @@ class ReedClient:
         api_key: str,
         *,
         client: httpx.Client | None = None,
+        retry_attempts: int = 3,
+        retry_backoff_seconds: float = 0.5,
     ) -> None:
         self.api_key = api_key
         self.client = client
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def search(
         self,
@@ -31,18 +40,25 @@ class ReedClient:
         try:
             for track in search_config["career_tracks"]:
                 for query in track.get("reed_queries", track.get("adzuna_queries", [])):
-                    response = client.get(
-                        self.endpoint,
-                        params={
-                            "keywords": query,
-                            "permanent": "true",
-                            "fullTime": "true",
-                            "postedByDirectEmployer": "true",
-                            "resultsToTake": results_per_query,
-                        },
-                        auth=httpx.BasicAuth(self.api_key, ""),
-                    )
-                    response.raise_for_status()
+                    try:
+                        response = request_with_retries(
+                            client,
+                            self.endpoint,
+                            source_name="Reed",
+                            attempts=self.retry_attempts,
+                            backoff_seconds=self.retry_backoff_seconds,
+                            params={
+                                "keywords": query,
+                                "permanent": "true",
+                                "fullTime": "true",
+                                "postedByDirectEmployer": "true",
+                                "resultsToTake": results_per_query,
+                            },
+                            auth=httpx.BasicAuth(self.api_key, ""),
+                        )
+                    except SourceRequestError as exc:
+                        logger.warning("%s; skipping query %r", exc, query)
+                        continue
                     for advert in response.json().get("results", []):
                         identifier = str(advert.get("jobId") or "")
                         if not identifier or identifier in seen:

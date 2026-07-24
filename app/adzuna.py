@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
+
+from app.http_retry import SourceRequestError, request_with_retries
+
+logger = logging.getLogger(__name__)
 
 
 class AdzunaClient:
@@ -14,10 +19,14 @@ class AdzunaClient:
         app_key: str,
         *,
         client: httpx.Client | None = None,
+        retry_attempts: int = 3,
+        retry_backoff_seconds: float = 0.5,
     ) -> None:
         self.app_id = app_id
         self.app_key = app_key
         self.client = client
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def search(
         self,
@@ -33,19 +42,26 @@ class AdzunaClient:
         try:
             for track in search_config["career_tracks"]:
                 for query in track.get("adzuna_queries", []):
-                    response = client.get(
-                        self.endpoint,
-                        params={
-                            "app_id": self.app_id,
-                            "app_key": self.app_key,
-                            "results_per_page": results_per_query,
-                            "what": query,
-                            "max_days_old": 14,
-                            "sort_by": "date",
-                            "content-type": "application/json",
-                        },
-                    )
-                    response.raise_for_status()
+                    try:
+                        response = request_with_retries(
+                            client,
+                            self.endpoint,
+                            source_name="Adzuna",
+                            attempts=self.retry_attempts,
+                            backoff_seconds=self.retry_backoff_seconds,
+                            params={
+                                "app_id": self.app_id,
+                                "app_key": self.app_key,
+                                "results_per_page": results_per_query,
+                                "what": query,
+                                "max_days_old": 14,
+                                "sort_by": "date",
+                                "content-type": "application/json",
+                            },
+                        )
+                    except SourceRequestError as exc:
+                        logger.warning("%s; skipping query %r", exc, query)
+                        continue
                     for advert in response.json().get("results", []):
                         identifier = str(advert.get("id") or advert.get("redirect_url") or "")
                         if not identifier or identifier in seen:
