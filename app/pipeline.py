@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -9,7 +10,12 @@ from app.adzuna import AdzunaClient
 from app.config import Settings
 from app.db import Database
 from app.emailer import ResendEmailer
-from app.job_logic import prepare_job, qualification_status, sponsorship_tier
+from app.job_logic import (
+    canonicalise_url,
+    prepare_job,
+    qualification_status,
+    sponsorship_tier,
+)
 from app.openai_service import OpenAIJobService
 from app.reed import ReedClient
 from app.sponsor_register import SponsorMatcher, download_sponsors, normalise_company_name
@@ -73,10 +79,32 @@ class JobPipeline:
             matcher = SponsorMatcher(
                 sponsor_rows, threshold=self.settings.sponsor_match_threshold
             )
-            web_target = max(1, self.settings.max_discovered_jobs // 2)
+            priority_target = min(
+                self.settings.max_discovered_jobs,
+                self.settings.public_sector_reserved_jobs,
+            )
+            priority_jobs = self.ai.discover_priority_source_jobs(priority_target)
+            priority_counts = Counter(
+                str(job.get("source_name") or "Unknown") for job in priority_jobs
+            )
+            for source in self.ai.search_config.get("priority_sources", []):
+                logger.info(
+                    "%s dedicated search returned %s vacancies",
+                    source["name"],
+                    priority_counts[source["name"]],
+                )
+
+            non_priority_capacity = max(
+                0, self.settings.max_discovered_jobs - len(priority_jobs)
+            )
+            web_target = non_priority_capacity // 2
             web_jobs = self.ai.discover_jobs(web_target)
             reviewed_jobs: list[dict] = []
-            remaining = self.settings.max_discovered_jobs - len(web_jobs)
+            remaining = (
+                self.settings.max_discovered_jobs
+                - len(priority_jobs)
+                - len(web_jobs)
+            )
             candidate_sources: list[list[dict]] = []
             if self.adzuna:
                 adzuna_candidates = _safe_provider_search(
@@ -107,9 +135,13 @@ class JobPipeline:
                 candidates = _interleave_sources(*candidate_sources)
                 reviewed_jobs = self.ai.review_candidates(candidates, remaining)
                 logger.info("%s aggregated candidates passed AI review", len(reviewed_jobs))
-            raw_jobs = _deduplicate_jobs(web_jobs + reviewed_jobs)[
+            raw_jobs = _deduplicate_jobs(priority_jobs + web_jobs + reviewed_jobs)[
                 : self.settings.max_discovered_jobs
             ]
+            stored_source_counts = Counter(
+                str(job.get("source_name") or "Unknown") for job in raw_jobs
+            )
+            logger.info("Vacancies selected by source: %s", dict(stored_source_counts))
             discovered = len(raw_jobs)
             with VacancyValidator() as validator:
                 validations = validator.validate_many(raw_jobs)
@@ -125,7 +157,9 @@ class JobPipeline:
                 self._revalidate_pending_jobs(validator)
 
             jobs = self.db.unemailed_digest_jobs(
-                possible_limit=self.settings.possible_email_limit
+                possible_limit=self.settings.possible_email_limit,
+                public_sector_limit=self.settings.public_sector_email_limit,
+                public_sector_min_fit=self.settings.min_fit_score,
             )
             qualified = len(jobs)
             if jobs and not self.settings.dry_run_email:
@@ -171,7 +205,9 @@ class JobPipeline:
     def send_pending(self) -> int:
         self.db.initialise()
         jobs = self.db.unemailed_digest_jobs(
-            possible_limit=self.settings.possible_email_limit
+            possible_limit=self.settings.possible_email_limit,
+            public_sector_limit=self.settings.public_sector_email_limit,
+            public_sector_min_fit=self.settings.min_fit_score,
         )
         if not jobs:
             return 0
@@ -205,7 +241,7 @@ def _deduplicate_jobs(jobs: list[dict]) -> list[dict]:
     seen_urls: set[str] = set()
     seen_roles: set[tuple[str, str]] = set()
     for job in jobs:
-        url = str(job.get("vacancy_url") or "").strip().casefold().split("?", 1)[0]
+        url = canonicalise_url(str(job.get("vacancy_url") or "")).casefold()
         title = " ".join(
             _NON_WORD.sub(" ", str(job.get("title") or "").casefold()).split()
         )

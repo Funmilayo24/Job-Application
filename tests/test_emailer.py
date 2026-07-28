@@ -52,3 +52,33 @@ def test_digest_separates_possible_sponsorship_jobs() -> None:
     assert "Sponsorship possible — confirm before applying" in rendered
     assert "Confirmation required" in rendered
     assert "require Skilled Worker" in rendered
+
+
+def test_digest_shows_public_sector_jobs_needing_manual_review() -> None:
+    rendered = render_digest(
+        [
+            {
+                "title": "Digital Project Manager",
+                "employer": "Example NHS Foundation Trust",
+                "location": "Leeds",
+                "vacancy_url": "https://www.jobs.nhs.uk/candidate/jobadvert/C1234",
+                "fit_score": 84,
+                "source_name": "NHS Jobs",
+                "qualification_status": "review_sponsor_not_matched",
+            },
+            {
+                "title": "Product Manager",
+                "employer": "Government Digital Service",
+                "vacancy_url": (
+                    "https://www.civilservicejobs.service.gov.uk/csr/jobs.cgi?"
+                    "jcode=123"
+                ),
+                "fit_score": 81,
+                "source_name": "Civil Service Jobs",
+                "qualification_status": "review_salary_unclear",
+            },
+        ]
+    )
+    assert "Public-sector matches — sponsorship review required" in rendered
+    assert "Example NHS Foundation Trust" in rendered
+    assert "salary or occupation-code eligibility" in rendered

@@ -38,8 +38,16 @@ def test_send_pending_emails_and_marks_jobs_without_searching() -> None:
         def initialise(self) -> None:
             pass
 
-        def unemailed_digest_jobs(self, *, possible_limit: int) -> list[dict]:
+        def unemailed_digest_jobs(
+            self,
+            *,
+            possible_limit: int,
+            public_sector_limit: int,
+            public_sector_min_fit: int,
+        ) -> list[dict]:
             assert possible_limit == 15
+            assert public_sector_limit == 10
+            assert public_sector_min_fit == 65
             return [{"id": 7}, {"id": 8}]
 
         def mark_emailed(self, job_ids: list[int]) -> None:
@@ -53,7 +61,12 @@ def test_send_pending_emails_and_marks_jobs_without_searching() -> None:
             return "email-id"
 
     pipeline = JobPipeline.__new__(JobPipeline)
-    pipeline.settings = SimpleNamespace(possible_email_limit=15, dry_run_email=False)
+    pipeline.settings = SimpleNamespace(
+        possible_email_limit=15,
+        public_sector_email_limit=10,
+        min_fit_score=65,
+        dry_run_email=False,
+    )
     pipeline.db = FakeDatabase()
     pipeline.emailer = FakeEmailer()
 
@@ -69,3 +82,25 @@ def test_provider_failure_isolated_without_logging_exception_message(caplog) -> 
     assert _safe_provider_search("Example", failed_search) == []
     assert "continuing with other sources (RuntimeError)" in caplog.text
     assert "secret-api-key" not in caplog.text
+
+
+def test_civil_service_jobs_with_distinct_jcodes_are_not_deduplicated() -> None:
+    jobs = [
+        {
+            "title": "Project Manager",
+            "employer": "Department One",
+            "vacancy_url": (
+                "https://www.civilservicejobs.service.gov.uk/csr/jobs.cgi?"
+                "jcode=111&tracking=ignored"
+            ),
+        },
+        {
+            "title": "Project Manager",
+            "employer": "Department Two",
+            "vacancy_url": (
+                "https://www.civilservicejobs.service.gov.uk/csr/jobs.cgi?"
+                "jcode=222&tracking=ignored"
+            ),
+        },
+    ]
+    assert len(_deduplicate_jobs(jobs)) == 2

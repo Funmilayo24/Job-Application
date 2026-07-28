@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from openai import OpenAI
 
@@ -122,8 +123,9 @@ class OpenAIJobService:
         self.search_config = load_search_config()
 
     def discover_jobs(self, max_jobs: int) -> list[dict[str, Any]]:
+        if max_jobs <= 0:
+            return []
         tracks = self.search_config["career_tracks"]
-        priority_sources = self.search_config.get("priority_sources", [])
         per_track = max(1, (max_jobs + len(tracks) - 1) // len(tracks))
         jobs: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -134,16 +136,6 @@ Find up to {per_track} currently open UK vacancies matching this career track:
 
 Search employer career sites and public job listings. Do not automate or access a
 logged-in LinkedIn or Indeed account.
-
-PRIORITY OFFICIAL SOURCES:
-{json.dumps(priority_sources, ensure_ascii=False)}
-- Search these official sources explicitly for every career track, alongside the wider
-  web search. Use site-specific searches for the configured domains where useful.
-- Set source_name to the configured source name when a vacancy is found there.
-- Include a priority-source vacancy only when it satisfies the same responsibility,
-  vacancy-status, salary and sponsorship-evidence standards as every other result.
-- NHS or Civil Service affiliation is not evidence that the individual vacancy offers
-  sponsorship. Preserve explicit exclusions and silence exactly as described below.
 
 SPONSORSHIP SEARCH POLICY:
 - Return two kinds of strong CV matches: vacancies that explicitly offer Skilled
@@ -185,6 +177,69 @@ track. Do not lower the CV-fit, sponsorship or salary evidence standards.
                 if len(jobs) >= max_jobs:
                     return jobs
         return jobs
+
+    def discover_priority_source_jobs(self, max_jobs: int) -> list[dict[str, Any]]:
+        """Run independent, capacity-reserved searches for each official source."""
+        sources = self.search_config.get("priority_sources", [])
+        tracks = self.search_config["career_tracks"]
+        if max_jobs <= 0 or not sources:
+            return []
+
+        per_source = max(1, (max_jobs + len(sources) - 1) // len(sources))
+        jobs: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for source in sources:
+            source_jobs: list[dict[str, Any]] = []
+            per_track = max(1, (per_source + len(tracks) - 1) // len(tracks))
+            for track in tracks:
+                prompt = f"""
+Search only the official {source["name"]} website for up to {per_track} currently
+open UK vacancies matching this career track:
+{json.dumps(track, ensure_ascii=False)}
+
+Official source configuration:
+{json.dumps(source, ensure_ascii=False)}
+
+Use site-specific searches restricted to {source["domain"]}. Do not substitute
+aggregators or other employer sites. Return the official vacancy URL and set
+source_name exactly to {json.dumps(source["name"])}.
+
+Apply these rules:
+- Use configured titles as search seeds, not an exact-match allowlist.
+- Include only strong responsibility matches supported by the candidate profile.
+- Include externally advertised roles only.
+- Exclude closed, expired, duplicate, contract-only and low-similarity roles.
+- Detect explicit Skilled Worker/CoS sponsorship or exclusion wording exactly.
+- Silence about sponsorship is not an offer.
+- Assess salary eligibility only when supported; otherwise use "unclear".
+- NHS or Civil Service affiliation is not evidence that the vacancy offers sponsorship.
+- Use only candidate-profile facts for fit scoring and never infer credentials.
+
+Candidate profile:
+{json.dumps(self.profile, ensure_ascii=False)}
+"""
+                for job in self._request_jobs(prompt, use_web=True):
+                    url = str(job.get("vacancy_url") or "").strip()
+                    if not self._url_matches_domain(url, str(source["domain"])):
+                        continue
+                    key = url.casefold()
+                    if not key or key in seen:
+                        continue
+                    seen.add(key)
+                    job["source_name"] = source["name"]
+                    source_jobs.append(job)
+                    if len(source_jobs) >= per_source:
+                        break
+                if len(source_jobs) >= per_source:
+                    break
+            jobs.extend(source_jobs)
+        return jobs[:max_jobs]
+
+    @staticmethod
+    def _url_matches_domain(url: str, domain: str) -> bool:
+        host = (urlsplit(url).hostname or "").casefold()
+        expected = domain.casefold()
+        return host == expected or host.endswith(f".{expected}")
 
     def review_candidates(
         self, candidates: list[dict[str, Any]], max_jobs: int

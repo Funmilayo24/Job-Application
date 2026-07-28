@@ -82,7 +82,16 @@ def render_digest(jobs: list[dict[str, Any]]) -> str:
         if job.get("sponsorship_tier") == "confirmed"
         or job.get("qualification_status") == "qualified_confirmed"
     ]
-    possible = [job for job in jobs if job not in confirmed]
+    public_sector_review = [
+        job
+        for job in jobs
+        if job.get("source_name") in {"NHS Jobs", "Civil Service Jobs"}
+        and job.get("qualification_status")
+        in {"review_sponsor_not_matched", "review_salary_unclear"}
+    ]
+    possible = [
+        job for job in jobs if job not in confirmed and job not in public_sector_review
+    ]
 
     sections = []
     if confirmed:
@@ -111,6 +120,50 @@ def render_digest(jobs: list[dict[str, Any]]) -> str:
               specific role?
             </blockquote>
             {_render_job_table(possible, possible=True)}
+            """
+        )
+    if public_sector_review:
+        review_rows = []
+        for job in public_sector_review:
+            if job.get("qualification_status") == "review_salary_unclear":
+                issue = (
+                    "The vacancy mentions sponsorship, but salary or occupation-code "
+                    "eligibility could not be confirmed."
+                )
+            else:
+                issue = (
+                    "The employer name could not be confidently matched to the sponsor "
+                    "register. Check the employing organisation and advert wording."
+                )
+            vacancy_url = job.get("resolved_vacancy_url") or job["vacancy_url"]
+            review_rows.append(
+                f"""
+                <tr>
+                  <td><a href="{html.escape(str(vacancy_url), quote=True)}">
+                    {html.escape(str(job["title"]))}</a><br>
+                    <strong>{html.escape(str(job["employer"]))}</strong><br>
+                    {html.escape(str(job.get("location") or "Location not stated"))}
+                  </td>
+                  <td>{html.escape(str(job.get("source_name")))}</td>
+                  <td>{int(job.get("fit_score", 0))}%</td>
+                  <td>{html.escape(issue)}</td>
+                </tr>
+                """
+            )
+        sections.append(
+            f"""
+            <h3>Public-sector matches — sponsorship review required
+              ({len(public_sector_review)})</h3>
+            <p>
+              These strong NHS or Civil Service matches would previously have been
+              hidden from the email. Review sponsorship and salary eligibility before
+              applying.
+            </p>
+            <table style="border-collapse:collapse;width:100%" border="1" cellpadding="8">
+              <thead><tr><th>Vacancy</th><th>Source</th><th>Fit</th>
+                <th>Why review is required</th></tr></thead>
+              <tbody>{''.join(review_rows)}</tbody>
+            </table>
             """
         )
 

@@ -415,7 +415,13 @@ class Database:
                 ),
             )
 
-    def unemailed_digest_jobs(self, *, possible_limit: int = 5) -> list[dict[str, Any]]:
+    def unemailed_digest_jobs(
+        self,
+        *,
+        possible_limit: int = 5,
+        public_sector_limit: int = 10,
+        public_sector_min_fit: int = 65,
+    ) -> list[dict[str, Any]]:
         with self.connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -435,8 +441,22 @@ class Database:
                     ORDER BY fit_score DESC, first_seen_at DESC
                     LIMIT %s
                 )
+                UNION ALL
+                (
+                    SELECT *
+                    FROM jobs
+                    WHERE source_name IN ('NHS Jobs', 'Civil Service Jobs')
+                      AND qualification_status IN (
+                          'review_sponsor_not_matched',
+                          'review_salary_unclear'
+                      )
+                      AND fit_score >= %s
+                      AND emailed_at IS NULL
+                    ORDER BY fit_score DESC, first_seen_at DESC
+                    LIMIT %s
+                )
                 """,
-                (possible_limit,),
+                (possible_limit, public_sector_min_fit, public_sector_limit),
             )
             return list(cursor.fetchall())
 

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.job_logic import canonical_key, prepare_job, qualification_status
+from app.job_logic import canonical_key, canonicalise_url, prepare_job, qualification_status
 from app.openai_service import load_search_config
 
 
@@ -39,6 +39,14 @@ def test_canonical_key_ignores_tracking_query() -> None:
     one = base_job()
     two = {**one, "vacancy_url": "https://example.com/jobs/123?ref=linkedin"}
     assert canonical_key(one) == canonical_key(two)
+
+
+def test_civil_service_canonical_url_preserves_job_identifier() -> None:
+    url = (
+        "https://www.civilservicejobs.service.gov.uk/csr/jobs.cgi?"
+        "jcode=1912345&utm_source=email"
+    )
+    assert canonicalise_url(url).endswith("jobs.cgi?jcode=1912345")
 
 
 def test_qualified_requires_all_gates() -> None:

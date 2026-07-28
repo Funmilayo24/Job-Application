@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 _SPACE = re.compile(r"\s+")
 
@@ -13,7 +13,17 @@ def canonicalise_url(url: str) -> str:
     scheme = parts.scheme.casefold() or "https"
     host = parts.netloc.casefold()
     path = parts.path.rstrip("/")
-    return urlunsplit((scheme, host, path, "", ""))
+    query = ""
+    if host == "civilservicejobs.service.gov.uk" or host.endswith(
+        ".civilservicejobs.service.gov.uk"
+    ):
+        identifying = [
+            (key, value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=False)
+            if key.casefold() in {"jcode", "jobid", "id"}
+        ]
+        query = urlencode(identifying)
+    return urlunsplit((scheme, host, path, query, ""))
 
 
 def canonical_key(job: dict[str, Any]) -> str:

@@ -41,6 +41,8 @@ class Settings:
     reed_results_per_query: int
     reed_max_candidates: int
     possible_email_limit: int
+    public_sector_reserved_jobs: int
+    public_sector_email_limit: int
 
     @classmethod
     def from_env(cls, *, require_secrets: bool = True) -> Settings:
@@ -90,4 +92,6 @@ class Settings:
             reed_results_per_query=_int("REED_RESULTS_PER_QUERY", 10),
             reed_max_candidates=_int("REED_MAX_CANDIDATES", 40),
             possible_email_limit=_int("POSSIBLE_EMAIL_LIMIT", 15),
+            public_sector_reserved_jobs=_int("PUBLIC_SECTOR_RESERVED_JOBS", 20),
+            public_sector_email_limit=_int("PUBLIC_SECTOR_EMAIL_LIMIT", 10),
         )
